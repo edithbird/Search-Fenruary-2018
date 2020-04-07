@@ -1,0 +1,215 @@
+---
+title: "FY18_Search_Winter 2018"
+author: "Office of Marketing and Brand Management"
+date: "Updated on `r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+
+library(knitr)
+
+library(tidyr)
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+LeadsUploaded <- read.csv("C:/Users/christine.iyer/Box/Search/FY18_Search/Search_Feb_2018/Search_February2018_Downloads.csv", header = T, stringsAsFactors = F)
+LeadsUploaded <- LeadsUploaded %>%  mutate(
+  Vendor = ifelse(grepl('^N', Recruiting.Category), 'NRCCUA', 'College Board'),
+   Class = ifelse(grepl('SR', Recruiting.Category), 'Senior', 'Junior') ,
+    Geo = ifelse(grepl('O', Recruiting.Category), 'Out-of-State', 'In-State'))
+Leads <- LeadsUploaded %>% group_by(Vendor, Class, Geo) %>% summarise(Leads = n())
+
+
+```
+
+
+
+```{r}
+Inquiries <- LeadsUploaded %>% filter(Student.Stage != "Lead") %>% mutate(ApplicationStatus = ifelse(grepl("Confirmed", App.Application.Status), "Confirmed", 
+                                                                                                     ifelse(App.Application.Status == "Enrolled", "Enrolled", 
+                                                                                                            ifelse(App.Application.Status == "Withdrawn (After Admitted)", "Admitted",
+                                                                                                            ifelse(App.Application.Status == "", "Inquiry", "Applied")))))
+
+#trythis
+# Don't forget to change the date!
+
+# write.csv(Inquiries,"C:/Users/christine.iyer/Box/Search/FY18_Search/Search_Feb_2018/Conversions_February2018_4-3-20.csv", row.names = F)
+
+```
+
+
+```{r}
+
+
+Inquiries1 <- Inquiries %>% group_by(Vendor, Class, Geo, Student.Stage, ApplicationStatus) %>% summarise(Inquiries = n())
+# Final number inquiries
+Inquiries2 <- Inquiries1 %>% group_by(Vendor, Class, Geo) %>% summarise(Inquiries = sum(Inquiries))
+
+
+
+Applicants <- Inquiries1 %>% 
+  filter(ApplicationStatus!= "Inquiry") %>% 
+  group_by(Vendor, Class, Geo,  ApplicationStatus) %>% 
+  summarise(Apps = sum(Inquiries)) 
+#Final number Applicants
+
+Applicants1 <- Applicants %>% 
+  group_by(Vendor, Class, Geo) %>% 
+  summarise(Applicants = sum(Apps))
+Applicants1[8,1] <- "NRCCUA"
+Applicants1[8,2] <- "Senior"
+Applicants1[8,3] <- "Out-of_State"
+Applicants1[8,4] <- 0
+
+```
+
+```{r}
+
+Admits <- Applicants %>% 
+  filter(ApplicationStatus != "Applied") %>% 
+  group_by(Vendor, Class, Geo, ApplicationStatus) %>% 
+  summarise(Admits = sum(Apps))
+
+#FOr number of Admits
+
+Admits1 <- Admits %>% 
+  group_by(Vendor, Class, Geo) %>% 
+  summarise(Admits = sum(Admits))
+
+Admits1[8,1] <- "NRCCUA"
+Admits1[8,2] <- "Senior"
+Admits1[8,3] <- "Out-of_State"
+Admits1[8,4] <- 0
+
+```
+
+```{r}
+
+Confirms <- Admits %>% 
+  filter(ApplicationStatus != "Admitted") %>% 
+  group_by(Vendor, Class, Geo, ApplicationStatus) %>% 
+  summarise(Confirms = sum(Admits))
+
+#FOr number of Admits
+
+Confirms1 <- Confirms %>% 
+  group_by(Vendor, Class, Geo) %>% 
+  summarise(Confirms = sum(Confirms))
+Confirms1[8,1] <- "NRCCUA"
+Confirms1[8,2] <- "Senior"
+Confirms1[8,3] <- "Out-of_State"
+Confirms1[8,4] <- 0
+
+```
+
+```{r}
+#FOr number of Enrolls
+
+Enrolls <- Confirms %>% 
+  filter(ApplicationStatus == "Enrolled") %>% 
+  group_by(Vendor, Class, Geo) %>% 
+  summarise(Enrolls = sum(Confirms))
+
+Enrolls[8,1] <- "NRCCUA"
+Enrolls[8,2] <- "Senior"
+Enrolls[8,3] <- "Out-of_State"
+Enrolls[8,4] <- 0
+
+```
+
+```{r}
+Funnel <- cbind.data.frame(Leads, Inquiries2, Applicants1, Admits1, Confirms1, Enrolls)
+```
+
+
+
+
+```{r}
+
+Funnel <- Funnel[, c(1:4, 8,12, 16, 20, 24)]
+```
+
+
+
+```{r}
+
+nwew <- Funnel %>% 
+  mutate(Inquiry_Yield = 
+          paste0(round(Inquiries/Leads * 100,2), "%"),
+         App_Yield = 
+          paste0(round(Applicants/Leads * 100,2), "%"), 
+         Leads = prettyNum(Leads, big.mark = ",")) %>% 
+  select(Vendor, Class, Geo, Leads, Inquiries, Applicants, Admits, Confirms, Enrolls, Inquiry_Yield, App_Yield)
+        
+```
+
+
+**In-State Senior**
+
+```{r}
+kable(nwew %>% filter(Geo == "In-State" & Class == "Senior")%>% 
+        select(Geo:App_Yield))
+```
+
+```{r eval=FALSE, include=FALSE}
+nwew <- nwew %>% 
+  mutate(Inquiry_Yield = 
+          paste0(round(Inquiry/Leads * 100), 2), "%") 
+         # App_Yield = 
+         #  paste0(round((sum(Applicant)/sum(Leads) * 100), 2), "%")
+         
+
+kable(nwew)
+```
+
+**Out-of-State Senior **
+
+```{r}
+kable(nwew %>% filter(Geo == "Out-of-State" & Class == "Senior")%>% 
+        select(Geo:App_Yield))
+```
+
+**In-State Junior**
+
+```{r}
+kable(nwew %>% filter(Geo == "In-State" & Class == "Junior") %>% 
+        select(Geo:App_Yield))
+```
+
+**Out-of_State Junior**
+
+```{r}
+kable(nwew %>% filter(Geo == "Out-of-State" & Class == "Junior") %>% 
+        select(Geo:App_Yield))
+```
+
+```{r}
+# nwew <- left_join(LeadsUploaded, trythisGroupedStatus) %>% 
+#         mutate(Inquiry_Yield = paste0(round(sum(Inquiry)/ sum(Leads),4) *100, "%"))
+# 
+# kable(nwew)
+```
+
